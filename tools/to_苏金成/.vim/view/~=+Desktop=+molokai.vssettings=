@@ -1,0 +1,135 @@
+	 exch 1 sub -1 0
+						 {
+						 2 copy get 3 index eq
+								{1 index length exch sub 1 sub{end}repeat exit}
+								{pop}
+						 ifelse
+						 }
+					 for
+					 pop pop
+					 Adobe_CoolType_Utility/@eexecStartData get eexec
+					}
+					{cleartomark}
+				ifelse
+			}}
+			{{
+				Adobe_CoolType_Utility/@eexecStartData get eexec
+			}}
+		ifelse bind def
+userdict/cid_extensions known
+dup{cid_extensions/cid_UpdateDB known and}if
+	{
+	 cid_extensions
+	 begin
+	/cid_GetCIDSystemInfo
+		{
+		 1 index type/stringtype eq
+			{exch cvn exch}
+		 if
+		 cid_extensions
+			 begin
+			 dup load 2 index known
+				{
+				 2 copy
+				 cid_GetStatusInfo
+				 dup null ne
+					{
+					 1 index load
+					 3 index get
+					 dup null eq
+						 {pop pop cid_UpdateDB}
+						 {
+						 exch
+						 1 index/Created get eq
+							 {exch pop exch pop}
+							 {pop cid_UpdateDB}
+						 ifelse
+						 }
+					 ifelse
+					}
+					{pop cid_UpdateDB}
+				 ifelse
+				}
+				{cid_UpdateDB}
+			 ifelse
+			 end
+		}bind def
+	 end
+	}
+if
+ct_Level2?
+	{end setglobal}
+if
+	/ct_UseNativeCapability? systemdict/composefont known def
+	/ct_MakeOCF 35 dict def
+	/ct_Vars 25 dict def
+	/ct_GlyphDirProcs 6 dict def
+	/ct_BuildCharDict 15 dict dup
+		begin
+		/charcode 2 string def
+		/dst_string 1500 string def
+		/nullstring()def
+		/usewidths? true def
+		end def
+	ct_Level2?{setglobal}{pop}ifelse
+	ct_GlyphDirProcs
+		begin
+		/GetGlyphDirectory
+			{
+			systemdict/languagelevel known
+				{pop/CIDFont findresource/GlyphDirectory get}
+				{
+				1 index/CIDFont findresource/GlyphDirectory
+				get dup type/dicttype eq
+					{
+					dup dup maxlength exch length sub 2 index lt
+						{
+						dup length 2 index add dict copy 2 index
+						/CIDFont findresource/GlyphDirectory 2 index put
+						}
+					if
+					}
+				if
+				exch pop exch pop
+				}
+			ifelse
+			+
+			}def
+		/+
+			{
+			systemdict/languagelevel known
+				{
+				currentglobal false setglobal
+				3 dict begin
+					/vm exch def
+				}
+				{1 dict begin}
+			ifelse
+			/$ exch def
+			systemdict/languagelevel known
+				{
+				vm setglobal
+				/gvm currentglobal def
+				$ gcheck setglobal
+				}
+			if
+			?{$ begin}if
+			}def
+		/?{$ type/dicttype eq}def
+		/|{
+			userdict/Adobe_CoolType_Data known
+				{
+			Adobe_CoolType_Data/AddWidths? known
+				{
+				 currentdict Adobe_CoolType_Data
+					begin
+					 begin
+						AddWidths?
+								{
+								Adobe_CoolType_Data/CC 3 index put
+								?{def}{$ 3 1 roll put}ifelse
+								CC charcode exch 1 index 0 2 index 256 idiv put
+								1 index exch 1 exch 256 mod put
+								stringwidth 2 array astore
+								currentfont/Widths get exch CC exch put
+				

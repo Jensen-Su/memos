@@ -1,0 +1,21 @@
+What I have done:
+    . sudo service lightdm restart
+   problem not solved.
+
+   1. check the linux kernels' info:
+       sudo dpkg --get-selections | grep linux
+   2. query the current kernel in use
+       uname -a
+   3. delete the orther kernels:
+       sudo apt-get purge linux-headers-3.16.0-30 \
+       linux-image-3.16.0-30-generic
+       sudo apt-get purge linux-headers-3.16.0-51 \
+       linux-image-3.16.0-51-generic
+   4. sudo udpate-grub
+   problem not solved, however.
+
+   5. sudo mv .Xauthority .XauthorityBak;sudo reboot
+   problem not solved, however.
+
+
+

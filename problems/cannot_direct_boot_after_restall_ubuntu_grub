@@ -1,0 +1,16 @@
+my '\boot' is mounted to sda5 and '\' to sda6:
+
+.Boot the liveCD (usb ubuntu)
+.sudo mount /dev/sda5 /mnt
+.sudo grub-install --root-directory=/mnt /dev/sda
+.sudo reboot
+
+Note: before reboot, some people would suggest you 'sudo update-grub'.
+    This incured a problem here:
+        'error: failed to get cannonical path of /cow',
+    which I failed to solve after plenty of efforts. 
+    Then I discarded this line, and it just worked around.
+
+The system sucessfully boots, but grub still have some problem.
+
+After 'sudo apt-get upgrade', the grub boot guide just came back.

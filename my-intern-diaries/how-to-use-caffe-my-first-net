@@ -1,0 +1,69 @@
+###Prepare dataset.
+    1. Prepare your images. Classify them, and agrrange them like:
+        -dataset
+            -train
+                 train.txt
+                -pos
+                     00001.jpg
+                     00002.jpg
+                     ...
+                -neg
+                     10001.jpg
+                     10002.jpg
+                     ...
+            -val // test set
+                val.txt
+                -pos
+                     20001.jpg
+                     20002.jpg
+                     ...
+                -neg
+                     30001.jpg
+                     30002.jpg
+                     ...
+        
+        An example of train.txt file:
+            /pos/00001.jpg 1
+            /pos/00002.jpg 1
+            ...
+            /neg/10001.jpg 0
+            /neg/10002.jpg 0
+        An example of val.txt file:
+            /pos/20001.jpg 1
+            /pos/20002.jpg 1
+            ...
+            /neg/30001.jpg 0
+            /neg/30002.jpg 0
+       
+       It's clear that 'the/path/to/train/' + 'name of train.txt (.txt not included)' + '/pos/00001.jpg' makes up a complete path to the real image.
+
+    2. Create your dataset.
+        2.1 copy the file $CAFFE_ROOT/example/imagenet/create_image.sh, open this file, and change the correponding path:
+            // your lmdb dataset will reside here
+            EXAMPLE=examples/jcsu/ambulances
+            // here is where your .txt label files reside
+            DATA=data/jcsu/ambulances
+            // root of your train data
+            TRAIN_DATA_ROOT=data/jcsu/ambulances/train/
+            // root of your test data
+            VAL_DATA_ROOT=data/jcsu/ambulances/val/
+    
+        2.1 Execute this file under $CAFFE_ROOT
+
+    3. Create image mean file.
+        3.1 copy the file $CAFFE_ROOT/example/imagenet/make_image_mean.sh, open this file, and change the correponding path:
+        3.2 Exucute the file under $CAFFE_ROOT
+
+    OK, dataset is prepared! Next, define your own neural net.
+
+### Define you net.
+    
+    An example can be seen under ./jcsu/ambulances/mycifar2.prototxt
+
+#### Define your solver.
+    
+    An example can be seen under ./jcsu/ambulances/solver.prototxt
+
+
+
+    

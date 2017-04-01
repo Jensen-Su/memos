@@ -1,0 +1,29 @@
+The problem seems to be casued by some weird nvidia driver installed by 'sudo apt-get upgrade'
+
+Just doing 'sudo apt-get purge nvidia*; sudo apt-get autoremove'.
+
+Update.
+
+The problem is actually due to a wrong driver installed.
+
+To install the correct driver, firstly purge nvidia*, then:
+
+## to find out the model of your graphics card:
+    $ lspci -vnn | grep -i VGA -A 12
+
+## find out the right driver version for your graphics card:
+    curl: http://www.nvidia.com/Download/index.aspx
+
+## Setup the xorg-edgers ppa
+    $ sudo add-apt-repository ppa:xorg-edgers/ppa -y
+    $ apt-get update
+
+## Intall the driver
+
+    # the version for this machine is 367.57
+    $s sudo apt-get install nvidia-367
+
+NOTE: Never 'sudo apt-get install nvidia-current', which installed a 304 version for me, and caused rightly the problem.
+
+
+Installing the right GPU driver also solved the 'built-in display' problem for me.

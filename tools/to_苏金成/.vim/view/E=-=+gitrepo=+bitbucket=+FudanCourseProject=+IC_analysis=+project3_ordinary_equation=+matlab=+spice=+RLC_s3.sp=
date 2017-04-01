@@ -1,0 +1,143 @@
+ exec}
+							ifelse
+							end
+						}
+						}
+					ifelse
+					bind readonly def
+					Adobe_CoolType_Core/scfindfont/systemfindfont load put
+					}
+					{
+					/scfindfont
+						{
+						$SubstituteFont
+							begin
+							dup systemfindfont
+							dup/FontName known
+								{dup/FontName get dup 3 index ne}
+								{/noname true}
+							ifelse
+							dup
+								{
+								/$origfontnamefound 2 index def
+								/$origfontname 4 index def/$substituteFound true def
+								}
+							if
+							exch pop
+								{
+								$slen 0 gt
+								$sname null ne
+								3 index length $slen gt or and
+									{
+									pop dup $findfontByEnum findfont
+									dup maxlength 1 add dict
+										begin
+											{1 index/FID eq{pop pop}{def}ifelse}
+										forall
+										currentdict
+										end
+									definefont
+									dup/FontName known{dup/FontName get}{null}ifelse
+									$origfontnamefound ne
+										{
+										$origfontname $str cvs print
+										( substitution revised, using )print
+										dup/FontName known
+											{dup/FontName get}{(unspecified font)}
+										ifelse
+										$str cvs print(.\n)print
+										}
+									if
+									}
+									{exch pop}
+								ifelse
+								}
+								{exch pop}
+							ifelse
+							end
+						}bind def
+					}
+				ifelse
+				end
+			end
+		Adobe_CoolType_Core_Defined not
+			{
+			Adobe_CoolType_Core/findfont
+				{
+				$SubstituteFont
+					begin
+					$depth 0 eq
+						{
+						/$fontname 1 index dup type/stringtype ne{$str cvs}if def
+						/$substituteFound false def
+						}
+					if
+					/$depth $depth 1 add def
+					end
+				scfindfont
+				$SubstituteFont
+					begin
+					/$depth $depth 1 sub def
+					$substituteFound $depth 0 eq and
+						{
+						$inVMIndex null ne
+							{dup $inVMIndex $AddInVMFont}
+						if
+						$doSmartSub
+							{
+							currentdict/$Strategy known
+								{$Strategy/$BuildFont get exec}
+							if
+							}
+						if
+						}
+					if
+					end
+				}bind put
+			}
+		if
+		}
+	if
+	end
+/$AddInVMFont
+	{
+	exch/FontName 2 copy known
+		{
+		get
+		1 dict dup begin exch 1 index gcheck def end exch
+		Adobe_CoolType_Data/InVMFontsByCMap get exch
+		$DictAdd
+		}
+		{pop pop pop}
+	ifelse
+	}bind def
+/$DictAdd
+	{
+	2 copy known not
+		{2 copy 4 index length dict put}
+	if
+	Level2? not
+		{
+		2 copy get dup maxlength exch length 4 index length add lt
+		2 copy get dup length 4 index length add exch maxlength 1 index lt
+			{
+			2 mul dict
+				begin
+				2 copy get{forall}def
+				2 copy currentdict put
+				end
+			}
+			{pop}
+		ifelse
+		}
+	if
+	get
+		begin
+			{def}
+		forall
+		end
+	}bind def
+end
+end
+%%EndResource
+currentglobal 

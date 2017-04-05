@@ -6,208 +6,216 @@ paper: Long-term Recurrent Convolutional Networks for Visual Recognition and Des
 source: 
 - [Activity Recognition](https://github.com/LisaAnne/lisa-caffe-public)
 - [Image Captioning](https://github.com/jeffdonahue/caffe/tree/recurrent/examples)
+
 Author: Jeff Donahue, UC Berkeley, 2016
 
 1. Long Short-Term Memory Unit.
 
-Inputs: $x_t, ~c_{t-1}, ~h_{t-1}$
-Outputs: $c_t, h_t$
-$$
-\begin{align}
-(input gate)~~    i_t  &= \sigma(W_{xi}x_t + W_{hi}h_{t-1} + b_t) \\
-(forget gate) ~~  f_t  &= \sigma(W_{xf}x_t + W_{hf}h_{t-1} + b_f) \\
-(output gate)~~   o_t  &= \sigma(W_{xo}x_t + W_{ho}h_{t-1} + b_o) \\
-(input modulation gate)& \\
-                  g_t  &= tanh(W_{xc}x_t + W_{hc}h_{t-1} + b_c) \\
+    Inputs: $x_t, ~c_{t-1}, ~h_{t-1}$
+    Outputs: $c_t, h_t$
+    $$
+    \begin{align}
+    (input gate)~~    i_t  &= \sigma(W_{xi}x_t + W_{hi}h_{t-1} + b_t) \\
+    (forget gate) ~~  f_t  &= \sigma(W_{xf}x_t + W_{hf}h_{t-1} + b_f) \\
+    (output gate)~~   o_t  &= \sigma(W_{xo}x_t + W_{ho}h_{t-1} + b_o) \\
+    (input modulation gate)& \\
+                      g_t  &= tanh(W_{xc}x_t + W_{hc}h_{t-1} + b_c) \\
 
-(memory cell)~~   c_t  &= f_t \odot c_{t-1} + i_t \odot g_t \\
-(hidden state)~~  h_t  &= o_t \odot tanh(c_t)
-\end{align}
-$$
+    (memory cell)~~   c_t  &= f_t \odot c_{t-1} + i_t \odot g_t \\
+    (hidden state)~~  h_t  &= o_t \odot tanh(c_t)
+    \end{align}
+    $$
 
-where $i_t,~f_t,~o_t,~c_t,~h_t~\in\mathbb{R}^N$ with $N$ denoting the number of hidden units, $x\odot y$ denotes the element-wise product of vectors $x$ and $y$.
+    where $i_t,~f_t,~o_t,~c_t,~h_t~\in\mathbb{R}^N$ with $N$ denoting the number of hidden units, $x\odot y$ denotes the element-wise product of vectors $x$ and $y$.
 
-Because $i_t$ and $f_t$ are usually sigmoidal, their values lie within the range $[0, 1]$, and they can be thought of as knobs that the LSTM learns to selectively forget its previous memory or consider its current inputs. Likewise, the output gate $o_t$ learns how much of the memory cell to transfer to the hidden state.
+    Because $i_t$ and $f_t$ are usually sigmoidal, their values lie within the range $[0, 1]$, and they can be thought of as knobs that the LSTM learns to selectively forget its previous memory or consider its current inputs. Likewise, the output gate $o_t$ learns how much of the memory cell to transfer to the hidden state.
 
-Additional depth can be added to LSTMs by stacking them on top of each other, using the hidden state $h_t^{l-1}$ of the LSTM in layer $l-1$ as the input to the LSTM in layer $l$.
+    Additional depth can be added to LSTMs by stacking them on top of each other, using the hidden state $h_t^{l-1}$ of the LSTM in layer $l-1$ as the input to the LSTM in layer $l$.
 
+    Below is the its implementation in `CAFFE` framework. are usually sigmoidal, their values lie within the range $[0, 1]$, and they can be thought of as knobs that the LSTM learns to selectively forget its previous memory or consider its current inputs. Likewise, the output gate $o_t$ learns how much of the memory cell to transfer to the hidden state.
 
-Below is the its implementation in `CAFFE` framework.
+    Additional depth can be added to LSTMs by stacking them on top of each other, using the hidden state $h_t^{l-1}$ of the LSTM in layer $l-1$ as the input to the LSTM in layer $l$.
 
-```c++
-// $CAFFE_ROOT/include/caffe/layers/lstm_layer.hpp
-#ifndef CAFFE_LSTM_LAYER_HPP_
-#define CAFFE_LSTM_LAYER_HPP_
+    Below is the its implementation in `CAFFE` framework.
 
-#include <string>
-#include <utility>
-#include <vector>
+    ```c++
+    // $CAFFE_ROOT/include/caffe/layers/lstm_layer.hpp
+    #ifndef CAFFE_LSTM_LAYER_HPP_
+    #define CAFFE_LSTM_LAYER_HPP_
 
-#include "caffe/blob.hpp"
-#include "caffe/common.hpp"
-#include "caffe/layer.hpp"
-#include "caffe/layers/recurrent_layer.hpp"
-#include "caffe/net.hpp"
-#include "caffe/proto/caffe.pb.h"
+    #include <string>
+    #include <utility>
+    #include <vector>
 
-namespace caffe {
+    #include "caffe/blob.hpp"
+    #include "caffe/common.hpp"
+    #include "caffe/layer.hpp"
+    #include "caffe/layers/recurrent_layer.hpp"
+    #include "caffe/net.hpp"
+    #include "caffe/proto/caffe.pb.h"
 
-template <typename Dtype> class RecurrentLayer;
+    namespace caffe {
 
-/**
- * @brief Processes sequential inputs using a "Long Short-Term Memory" (LSTM)
- *        [1] style recurrent neural network (RNN). Implemented by unrolling
- *        the LSTM computation through time.
- *
- * The specific architecture used in this implementation is as described in
- * "Learning to Execute" [2], reproduced below:
- *     i_t := \sigmoid[ W_{hi} * h_{t-1} + W_{xi} * x_t + b_i ]
- *     f_t := \sigmoid[ W_{hf} * h_{t-1} + W_{xf} * x_t + b_f ]
- *     o_t := \sigmoid[ W_{ho} * h_{t-1} + W_{xo} * x_t + b_o ]
- *     g_t :=    \tanh[ W_{hg} * h_{t-1} + W_{xg} * x_t + b_g ]
- *     c_t := (f_t .* c_{t-1}) + (i_t .* g_t)
- *     h_t := o_t .* \tanh[c_t]
- * In the implementation, the i, f, o, and g computations are performed as a
- * single inner product.
- *
- * Notably, this implementation lacks the "diagonal" gates, as used in the
- * LSTM architectures described by Alex Graves [3] and others.
- *
- * [1] Hochreiter, Sepp, and Schmidhuber, Jürgen. "Long short-term memory."
- *     Neural Computation 9, no. 8 (1997): 1735-1780.
- *
- * [2] Zaremba, Wojciech, and Sutskever, Ilya. "Learning to execute."
- *     arXiv preprint arXiv:1410.4615 (2014).
- *
- * [3] Graves, Alex. "Generating sequences with recurrent neural networks."
- *     arXiv preprint arXiv:1308.0850 (2013).
- */
-template <typename Dtype>
-class LSTMLayer : public RecurrentLayer<Dtype> {
- public:
-  explicit LSTMLayer(const LayerParameter& param)
-      : RecurrentLayer<Dtype>(param) {}
+    template <typename Dtype> class RecurrentLayer;
 
-  virtual inline const char* type() const { return "LSTM"; }
+    /**
+     * @brief Processes sequential inputs using a "Long Short-Term Memory" (LSTM)
+     *        [1] style recurrent neural network (RNN). Implemented by unrolling
+     *        the LSTM computation through time.
+     *
+     * The specific architecture used in this implementation is as described in
+     * "Learning to Execute" [2], reproduced below:
+     *     i_t := \sigmoid[ W_{hi} * h_{t-1} + W_{xi} * x_t + b_i ]
+     *     f_t := \sigmoid[ W_{hf} * h_{t-1} + W_{xf} * x_t + b_f ]
+     *     o_t := \sigmoid[ W_{ho} * h_{t-1} + W_{xo} * x_t + b_o ]
+     *     g_t :=    \tanh[ W_{hg} * h_{t-1} + W_{xg} * x_t + b_g ]
+     *     c_t := (f_t .* c_{t-1}) + (i_t .* g_t)
+     *     h_t := o_t .* \tanh[c_t]
+     * In the implementation, the i, f, o, and g computations are performed as a
+     * single inner product.
+     *
+     * Notably, this implementation lacks the "diagonal" gates, as used in the
+     * LSTM architectures described by Alex Graves [3] and others.
+     *
+     * [1] Hochreiter, Sepp, and Schmidhuber, Jürgen. "Long short-term memory."
+     *     Neural Computation 9, no. 8 (1997): 1735-1780.
+     *
+     * [2] Zaremba, Wojciech, and Sutskever, Ilya. "Learning to execute."
+     *     arXiv preprint arXiv:1410.4615 (2014).
+     *
+     * [3] Graves, Alex. "Generating sequences with recurrent neural networks."
+     *     arXiv preprint arXiv:1308.0850 (2013).
+     */
+    template <typename Dtype>
+    class LSTMLayer : public RecurrentLayer<Dtype> {
+     public:
+      explicit LSTMLayer(const LayerParameter& param)
+          : RecurrentLayer<Dtype>(param) {}
 
- protected:
-  virtual void FillUnrolledNet(NetParameter* net_param) const;
-  virtual void RecurrentInputBlobNames(vector<string>* names) const;
-  virtual void RecurrentOutputBlobNames(vector<string>* names) const;
-  virtual void RecurrentInputShapes(vector<BlobShape>* shapes) const;
-  virtual void OutputBlobNames(vector<string>* names) const;
-};
+      virtual inline const char* type() const { return "LSTM"; }
 
-/**
- * @brief A helper for LSTMLayer: computes a single timestep of the
- *        non-linearity of the LSTM, producing the updated cell and hidden
- *        states.
- */
-template <typename Dtype>
-class LSTMUnitLayer : public Layer<Dtype> {
- public:
-  explicit LSTMUnitLayer(const LayerParameter& param)
-      : Layer<Dtype>(param) {}
-  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);
+     protected:
+      virtual void FillUnrolledNet(NetParameter* net_param) const;
+      virtual void RecurrentInputBlobNames(vector<string>* names) const;
+      virtual void RecurrentOutputBlobNames(vector<string>* names) const;
+      virtual void RecurrentInputShapes(vector<BlobShape>* shapes) const;
+      virtual void OutputBlobNames(vector<string>* names) const;
+    };
 
-  virtual inline const char* type() const { return "LSTMUnit"; }
-  virtual inline int ExactNumBottomBlobs() const { return 3; }
-  virtual inline int ExactNumTopBlobs() const { return 2; }
+    /**
+     * @brief A helper for LSTMLayer: computes a single timestep of the
+     *        non-linearity of the LSTM, producing the updated cell and hidden
+     *        states.
+     */
+    template <typename Dtype>
+    class LSTMUnitLayer : public Layer<Dtype> {
+     public:
+      explicit LSTMUnitLayer(const LayerParameter& param)
+          : Layer<Dtype>(param) {}
+      virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+          const vector<Blob<Dtype>*>& top);
 
-  virtual inline bool AllowForceBackward(const int bottom_index) const {
-    // Can't propagate to sequence continuation indicators.
-    return bottom_index != 2;
-  }
+      virtual inline const char* type() const { return "LSTMUnit"; }
+      virtual inline int ExactNumBottomBlobs() const { return 3; }
+      virtual inline int ExactNumTopBlobs() const { return 2; }
 
- protected:
-  /**
-   * @param bottom input Blob vector (length 3)
-   *   -# @f$ (1 \times N \times D) @f$
-   *      the previous timestep cell state @f$ c_{t-1} @f$
-   *   -# @f$ (1 \times N \times 4D) @f$
-   *      the "gate inputs" @f$ [i_t', f_t', o_t', g_t'] @f$
-   *   -# @f$ (1 \times N) @f$
-   *      the sequence continuation indicators  @f$ \delta_t @f$
-   * @param top output Blob vector (length 2)
-   *   -# @f$ (1 \times N \times D) @f$
-   *      the updated cell state @f$ c_t @f$, computed as:
-   *          i_t := \sigmoid[i_t']
-   *          f_t := \sigmoid[f_t']
-   *          o_t := \sigmoid[o_t']
-   *          g_t := \tanh[g_t']
-   *          c_t := cont_t * (f_t .* c_{t-1}) + (i_t .* g_t)
-   *   -# @f$ (1 \times N \times D) @f$
-   *      the updated hidden state @f$ h_t @f$, computed as:
-   *          h_t := o_t .* \tanh[c_t]
-   */
-  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);
-  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);
+      virtual inline bool AllowForceBackward(const int bottom_index) const {
+        // Can't propagate to sequence continuation indicators.
+        return bottom_index != 2;
+      }
 
-  /**
-   * @brief Computes the error gradient w.r.t. the LSTMUnit inputs.
-   *
-   * @param top output Blob vector (length 2), providing the error gradient with
-   *        respect to the outputs
-   *   -# @f$ (1 \times N \times D) @f$:
-   *      containing error gradients @f$ \frac{\partial E}{\partial c_t} @f$
-   *      with respect to the updated cell state @f$ c_t @f$
-   *   -# @f$ (1 \times N \times D) @f$:
-   *      containing error gradients @f$ \frac{\partial E}{\partial h_t} @f$
-   *      with respect to the updated cell state @f$ h_t @f$
-   * @param propagate_down see Layer::Backward.
-   * @param bottom input Blob vector (length 3), into which the error gradients
-   *        with respect to the LSTMUnit inputs @f$ c_{t-1} @f$ and the gate
-   *        inputs are computed.  Computatation of the error gradients w.r.t.
-   *        the sequence indicators is not implemented.
-   *   -# @f$ (1 \times N \times D) @f$
-   *      the error gradient w.r.t. the previous timestep cell state
-   *      @f$ c_{t-1} @f$
-   *   -# @f$ (1 \times N \times 4D) @f$
-   *      the error gradient w.r.t. the "gate inputs"
-   *      @f$ [
-   *          \frac{\partial E}{\partial i_t}
-   *          \frac{\partial E}{\partial f_t}
-   *          \frac{\partial E}{\partial o_t}
-   *          \frac{\partial E}{\partial g_t}
-   *          ] @f$
-   *   -# @f$ (1 \times 1 \times N) @f$
-   *      the gradient w.r.t. the sequence continuation indicators
-   *      @f$ \delta_t @f$ is currently not computed.
-   */
-  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
-      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
-      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+     protected:
+      /**
+       * @param bottom input Blob vector (length 3)
+       *   -# @f$ (1 \times N \times D) @f$
+       *      the previous timestep cell state @f$ c_{t-1} @f$
+       *   -# @f$ (1 \times N \times 4D) @f$
+       *      the "gate inputs" @f$ [i_t', f_t', o_t', g_t'] @f$
+       *   -# @f$ (1 \times N) @f$
+       *      the sequence continuation indicators  @f$ \delta_t @f$
+       * @param top output Blob vector (length 2)
+       *   -# @f$ (1 \times N \times D) @f$
+       *      the updated cell state @f$ c_t @f$, computed as:
+       *          i_t := \sigmoid[i_t']
+       *          f_t := \sigmoid[f_t']
+       *          o_t := \sigmoid[o_t']
+       *          g_t := \tanh[g_t']
+       *          c_t := cont_t * (f_t .* c_{t-1}) + (i_t .* g_t)
+       *   -# @f$ (1 \times N \times D) @f$
+       *      the updated hidden state @f$ h_t @f$, computed as:
+       *          h_t := o_t .* \tanh[c_t]
+       */
+      virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+          const vector<Blob<Dtype>*>& top);
+      virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+          const vector<Blob<Dtype>*>& top);
 
-  /// @brief The hidden and output dimension.
-  int hidden_dim_;
-  Blob<Dtype> X_acts_;
-};
+      /**
+       * @brief Computes the error gradient w.r.t. the LSTMUnit inputs.
+       *
+       * @param top output Blob vector (length 2), providing the error gradient with
+       *        respect to the outputs
+       *   -# @f$ (1 \times N \times D) @f$:
+       *      containing error gradients @f$ \frac{\partial E}{\partial c_t} @f$
+       *      with respect to the updated cell state @f$ c_t @f$
+       *   -# @f$ (1 \times N \times D) @f$:
+       *      containing error gradients @f$ \frac{\partial E}{\partial h_t} @f$
+       *      with respect to the updated cell state @f$ h_t @f$
+       * @param propagate_down see Layer::Backward.
+       * @param bottom input Blob vector (length 3), into which the error gradients
+       *        with respect to the LSTMUnit inputs @f$ c_{t-1} @f$ and the gate
+       *        inputs are computed.  Computatation of the error gradients w.r.t.
+       *        the sequence indicators is not implemented.
+       *   -# @f$ (1 \times N \times D) @f$
+       *      the error gradient w.r.t. the previous timestep cell state
+       *      @f$ c_{t-1} @f$
+       *   -# @f$ (1 \times N \times 4D) @f$
+       *      the error gradient w.r.t. the "gate inputs"
+       *      @f$ [
+       *          \frac{\partial E}{\partial i_t}
+       *          \frac{\partial E}{\partial f_t}
+       *          \frac{\partial E}{\partial o_t}
+       *          \frac{\partial E}{\partial g_t}
+       *          ] @f$
+       *   -# @f$ (1 \times 1 \times N) @f$
+       *      the gradient w.r.t. the sequence continuation indicators
+       *      @f$ \delta_t @f$ is currently not computed.
+       */
+      virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+          const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+      virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+          const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-}  // namespace caffe
+      /// @brief The hidden and output dimension.
+      int hidden_dim_;
+      Blob<Dtype> X_acts_;
+    };
 
-#endif  // CAFFE_LSTM_LAYER_HPP_
-```
+    }  // namespace caffe
 
-Just note the inputs and outputs:
-    @param bottom input Blob vector (length 3)
-      -# @f$ (1 \times N \times D) @f$
-         the previous timestep cell state @f$ c_{t-1} @f$
-      -# @f$ (1 \times N \times 4D) @f$
-         the "gate inputs" @f$ [i_t', f_t', o_t', g_t'] @f$
-      -# @f$ (1 \times N) @f$
-         the sequence continuation indicators  @f$ \delta_t @f$
-    @param top output Blob vector (length 2)
-      -# @f$ (1 \times N \times D) @f$
-         the updated cell state @f$ c_t @f$, computed as:
-             i_t := \sigmoid[i_t']
-             f_t := \sigmoid[f_t']
-             o_t := \sigmoid[o_t']
-             g_t := \tanh[g_t']
-             c_t := cont_t * (f_t .* c_{t-1}) + (i_t .* g_t)
-      -# @f$ (1 \times N \times D) @f$
-         the updated hidden state @f$ h_t @f$, computed as:
-             h_t := o_t .* \tanh[c_t]
+    #endif  // CAFFE_LSTM_LAYER_HPP_
+    ```
+
+    Just note the inputs and outputs:
+	- **param** - bottom **input** Blob vector (length 3)
+		- $ (1 \times N \times D) $
+		 	the previous timestep cell state $ c_{t-1} $
+		- $ (1 \times N \times 4D)$
+		 the "gate inputs" @f$ [i_t', f_t', o_t', g_t'] @f$
+		- $ (1 \times N) $
+		 the sequence continuation indicators  @f$ \delta_t @f$
+	- **param** - top **output** Blob vector (length 2)
+		- $ (1 \times N \times D) $
+		 the updated cell state $ c_t $, computed as:
+			 $$
+			 i_t := \sigma[i_t']\\
+			 f_t := \sigma[f_t']\\
+			 o_t := \sigma[o_t']\\
+			 g_t := tanh[g_t']\\
+			 c_t := cont_t * (f_t \odot c_{t-1}) + (i_t \odot g_t)
+			 $$
+		- $ (1 \times N \times D)$
+		 the updated hidden state $ h_t $, computed as:
+			 $$h_t := o_t \odot tanh[c_t]$$
+			 
+	Where $N$ denotes the number of time steps, and $D$ denotes the number of seperate data streams, i.e., batch size.

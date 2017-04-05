@@ -26,8 +26,5 @@ Restart your terminal.
         }
     $ KERAS_BACKEND=tensorflow python -c "from keras import backend"
 
-4. Install opencv if necessary:
-
-    $ conda install -c menpo opencv3=3.2.0
     
     
